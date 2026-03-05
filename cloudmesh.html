@@ -1,0 +1,802 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>CloudMesh — Enterprise Network Optimizer</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Barlow+Condensed:wght@400;600;700;800&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --bg:       #0b0f0e;
+    --bg2:      #111714;
+    --bg3:      #161d1a;
+    --border:   #1e2e28;
+    --green:    #00e87a;
+    --amber:    #f5a623;
+    --cyan:     #00d4c8;
+    --red:      #ff4c5e;
+    --purple:   #c084fc;
+    --text:     #c8ddd6;
+    --muted:    #4a6b5e;
+    --font-mono: 'IBM Plex Mono', monospace;
+    --font-disp: 'Barlow Condensed', sans-serif;
+  }
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg); color: var(--text);
+    font-family: var(--font-mono); font-size: 13px; min-height: 100vh;
+  }
+  body::before {
+    content: ''; position: fixed; inset: 0; pointer-events: none; z-index: 9999;
+    background: repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,0,0,0.03) 2px,rgba(0,0,0,0.03) 4px);
+  }
+
+  /* HEADER */
+  header {
+    background: var(--bg2); border-bottom: 1px solid var(--border);
+    padding: 0 28px; display: flex; align-items: stretch;
+    position: sticky; top: 0; z-index: 100;
+  }
+  .logo-block {
+    display: flex; align-items: center; gap: 12px;
+    padding: 14px 28px 14px 0; border-right: 1px solid var(--border); margin-right: 28px;
+  }
+  .logo-hex {
+    width: 36px; height: 36px; background: var(--green);
+    clip-path: polygon(50% 0%,100% 25%,100% 75%,50% 100%,0% 75%,0% 25%);
+    display: flex; align-items: center; justify-content: center;
+  }
+  .logo-title { font-family: var(--font-disp); font-size: 20px; font-weight: 800; color: #fff; letter-spacing: 3px; }
+  .logo-title span { color: var(--green); }
+  .logo-sub { font-size: 9px; color: var(--muted); letter-spacing: 2px; text-transform: uppercase; }
+
+  nav { display: flex; align-items: stretch; gap: 0; overflow-x: auto; }
+  nav button {
+    background: none; border: none; border-bottom: 3px solid transparent;
+    padding: 0 18px; cursor: pointer; color: var(--muted);
+    font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.5px;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 2px; white-space: nowrap; transition: all 0.2s; min-width: 110px;
+  }
+  nav button:hover { color: var(--text); background: rgba(0,232,122,0.03); }
+  nav button.active { color: var(--green); border-bottom-color: var(--green); background: rgba(0,232,122,0.06); }
+  nav button .tab-icon { font-size: 16px; }
+  nav button .tab-unit { font-size: 9px; opacity: 0.5; }
+
+  .status-bar {
+    margin-left: auto; display: flex; align-items: center; gap: 10px;
+    padding-left: 24px; border-left: 1px solid var(--border);
+  }
+  .status-dot { width: 6px; height: 6px; border-radius: 50%; }
+  .status-dot.online  { background: var(--green); box-shadow: 0 0 8px var(--green); animation: blink 2s ease-in-out infinite; }
+  .status-dot.offline { background: var(--red);   box-shadow: 0 0 8px var(--red); }
+  .status-dot.checking{ background: var(--amber); box-shadow: 0 0 8px var(--amber); animation: blink 0.5s ease-in-out infinite; }
+  @keyframes blink { 0%,100%{opacity:1}50%{opacity:0.3} }
+  .status-text { font-size: 10px; color: var(--muted); }
+
+  /* OFFLINE BANNER */
+  #offline-banner {
+    display: none; background: rgba(255,76,94,0.1); border-bottom: 1px solid rgba(255,76,94,0.3);
+    padding: 10px 28px; font-size: 12px; color: var(--red); text-align: center;
+  }
+
+  main { max-width: 1040px; margin: 0 auto; padding: 28px 24px; }
+
+  .panel { display: none; animation: fadeIn 0.3s ease; }
+  .panel.active { display: block; }
+  @keyframes fadeIn { from{opacity:0;transform:translateY(6px)} to{opacity:1;transform:none} }
+
+  .card {
+    background: var(--bg2); border: 1px solid var(--border);
+    border-radius: 8px; padding: 22px; margin-bottom: 20px;
+  }
+  .card-header {
+    display: flex; align-items: center; gap: 10px; margin-bottom: 18px;
+    padding-bottom: 14px; border-bottom: 1px solid var(--border);
+  }
+  .card-title { font-family: var(--font-disp); font-size: 17px; font-weight: 700; color: #fff; letter-spacing: 1.5px; text-transform: uppercase; }
+  .badge { margin-left: auto; font-size: 9px; letter-spacing: 1px; padding: 3px 8px; border-radius: 3px; text-transform: uppercase; font-weight: 600; }
+  .desc { color: var(--muted); font-size: 12px; line-height: 1.7; margin-bottom: 18px; }
+
+  .controls { display: flex; gap: 14px; flex-wrap: wrap; align-items: flex-end; margin-bottom: 20px; }
+  .ctrl-group { display: flex; flex-direction: column; gap: 5px; flex: 1; min-width: 160px; }
+  .ctrl-label { font-size: 10px; color: var(--muted); letter-spacing: 1px; text-transform: uppercase; }
+  .ctrl-val { font-size: 13px; text-align: right; margin-top: 2px; font-weight: 600; }
+  input[type=range] { width: 100%; height: 4px; cursor: pointer; accent-color: var(--green); }
+
+  .btn {
+    padding: 10px 24px; border-radius: 4px; font-family: var(--font-mono);
+    font-size: 11px; font-weight: 600; letter-spacing: 1.5px; cursor: pointer;
+    text-transform: uppercase; transition: all 0.2s; border: 1px solid; white-space: nowrap;
+  }
+  .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+  .btn-green  { background: rgba(0,232,122,0.1);  color: var(--green);  border-color: var(--green);  }
+  .btn-amber  { background: rgba(245,166,35,0.1);  color: var(--amber);  border-color: var(--amber);  }
+  .btn-cyan   { background: rgba(0,212,200,0.1);  color: var(--cyan);   border-color: var(--cyan);   }
+  .btn-red    { background: rgba(255,76,94,0.1);  color: var(--red);    border-color: var(--red);    }
+  .btn-purple { background: rgba(192,132,252,0.1); color: var(--purple); border-color: var(--purple); }
+  .btn:not(:disabled):hover { filter: brightness(1.2); transform: translateY(-1px); box-shadow: 0 4px 16px rgba(0,0,0,0.4); }
+
+  .stats { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 18px; }
+  .stat { flex: 1; min-width: 100px; background: var(--bg3); border: 1px solid var(--border); border-radius: 6px; padding: 10px 14px; }
+  .stat-label { font-size: 9px; color: var(--muted); letter-spacing: 1.5px; text-transform: uppercase; margin-bottom: 4px; }
+  .stat-val { font-family: var(--font-disp); font-size: 26px; font-weight: 700; line-height: 1; }
+  .stat-unit { font-size: 11px; color: var(--muted); margin-left: 3px; }
+
+  .progress-wrap { margin-bottom: 10px; }
+  .progress-label { display: flex; justify-content: space-between; font-size: 10px; color: var(--muted); margin-bottom: 4px; }
+  .progress-track { background: var(--bg3); border-radius: 2px; height: 5px; overflow: hidden; }
+  .progress-fill { height: 100%; border-radius: 2px; transition: width 0.5s cubic-bezier(0.4,0,0.2,1); }
+
+  .app-grid { display: grid; grid-template-columns: repeat(auto-fill,minmax(190px,1fr)); gap: 8px; margin-bottom: 18px; }
+  .app-chip { background: var(--bg3); border: 1px solid var(--border); border-radius: 6px; padding: 10px 12px; transition: all 0.3s; }
+  .app-chip.selected { background: rgba(0,232,122,0.06); border-color: rgba(0,232,122,0.3); }
+  .app-chip.rejected { background: rgba(255,76,94,0.05); border-color: rgba(255,76,94,0.2); }
+  .app-name { font-size: 12px; font-weight: 600; color: var(--text); margin-bottom: 4px; display: flex; justify-content: space-between; }
+  .app-meta { font-size: 10px; color: var(--muted); }
+
+  .terminal {
+    background: #060a08; border: 1px solid #162018; border-radius: 6px; padding: 12px 14px;
+    font-size: 11px; line-height: 1.8; max-height: 170px; overflow-y: auto; margin-top: 16px;
+  }
+  .terminal::-webkit-scrollbar { width: 4px; }
+  .terminal::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+  .t-ok   { color: var(--green); }
+  .t-info { color: var(--cyan); }
+  .t-warn { color: var(--amber); }
+  .t-err  { color: var(--red); }
+  .t-dim  { color: var(--muted); }
+  .t-cursor { animation: blink 1s step-end infinite; }
+
+  .net-wrap { background: #060a08; border: 1px solid var(--border); border-radius: 8px; padding: 10px; display: flex; justify-content: center; margin-bottom: 16px; }
+
+  .tbl { width: 100%; border-collapse: collapse; font-size: 11px; }
+  .tbl th { color: var(--muted); font-weight: 500; text-align: left; padding: 6px 10px; border-bottom: 1px solid var(--border); font-size: 10px; letter-spacing: 1px; text-transform: uppercase; }
+  .tbl td { padding: 7px 10px; border-bottom: 1px solid #161d1a; }
+  .tbl tr:last-child td { border-bottom: none; }
+
+  .split { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  @media (max-width: 680px) { .split { grid-template-columns: 1fr; } }
+
+  .key-box { background: var(--bg3); border: 1px solid var(--border); border-radius: 6px; padding: 10px 14px; margin-bottom: 8px; }
+  .key-box-label { font-size: 9px; color: var(--muted); letter-spacing: 1.5px; text-transform: uppercase; margin-bottom: 4px; }
+  .key-box-val { font-size: 11px; word-break: break-all; }
+
+  .bi-wrap { display: flex; align-items: stretch; gap: 0; background: #060a08; border: 1px solid var(--border); border-radius: 8px; padding: 16px; margin-bottom: 16px; min-height: 180px; }
+  .bi-col { display: flex; flex-direction: column; justify-content: space-around; gap: 8px; }
+  .bi-node { padding: 5px 12px; border-radius: 4px; font-size: 11px; font-weight: 500; border: 1px solid; text-align: center; transition: all 0.3s; white-space: nowrap; }
+  .bi-edges { flex: 1; position: relative; }
+  .bi-edges svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
+
+  .cover-nodes { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+  .cover-chip { padding: 4px 12px; border-radius: 4px; font-size: 11px; font-weight: 600; border: 1px solid; transition: all 0.3s; }
+  .divider { border: none; border-top: 1px solid var(--border); margin: 16px 0; }
+
+  /* LOADING SPINNER */
+  .spinner { display: inline-block; width: 12px; height: 12px; border: 2px solid transparent; border-top-color: currentColor; border-radius: 50%; animation: spin 0.7s linear infinite; vertical-align: middle; margin-right: 6px; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo-block">
+    <div class="logo-hex">
+      <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+        <path d="M9 2L15 5.5V12.5L9 16L3 12.5V5.5Z" stroke="#0b0f0e" stroke-width="1.5" fill="none"/>
+        <circle cx="9" cy="9" r="2.5" fill="#0b0f0e"/>
+      </svg>
+    </div>
+    <div>
+      <div class="logo-title">CLOUD<span>MESH</span></div>
+      <div class="logo-sub">Network Optimizer</div>
+    </div>
+  </div>
+
+  <nav id="nav">
+    <button class="active" onclick="switchTab('knapsack',this)">
+      <span class="tab-icon">🖥</span><span>Allocator</span><span class="tab-unit">Unit 1 · Knapsack</span>
+    </button>
+    <button onclick="switchTab('flow',this)">
+      <span class="tab-icon">🌐</span><span>Max Flow</span><span class="tab-unit">Unit 2A · F-F</span>
+    </button>
+    <button onclick="switchTab('bipartite',this)">
+      <span class="tab-icon">⚡</span><span>Load Balancer</span><span class="tab-unit">Unit 2B · Matching</span>
+    </button>
+    <button onclick="switchTab('vertex',this)">
+      <span class="tab-icon">🛡</span><span>Security</span><span class="tab-unit">Unit 3 · Vertex Cover</span>
+    </button>
+    <button onclick="switchTab('rsa',this)">
+      <span class="tab-icon">🔐</span><span>Key Gen</span><span class="tab-unit">Unit 4 · Miller-Rabin</span>
+    </button>
+  </nav>
+
+  <div class="status-bar">
+    <div class="status-dot checking" id="status-dot"></div>
+    <div class="status-text" id="status-text">Connecting…</div>
+  </div>
+</header>
+
+<div id="offline-banner">
+  ⚠ Cannot reach backend at <b id="api-url-display"></b> — make sure <code>python main.py</code> is running.
+</div>
+
+<main>
+
+<!-- PANEL 1 — KNAPSACK -->
+<div class="panel active" id="panel-knapsack">
+  <div class="card">
+    <div class="card-header">
+      <span style="font-size:20px">🖥</span>
+      <span class="card-title">Server Resource Allocator</span>
+      <span class="badge" style="background:rgba(0,232,122,0.1);color:var(--green);border:1px solid rgba(0,232,122,0.3)">0/1 KNAPSACK — BRANCH &amp; BOUND</span>
+    </div>
+    <p class="desc">Deploy the highest-priority microservices onto a server without exceeding CPU/RAM limits. Branch &amp; Bound explores the decision tree and prunes suboptimal branches for exact optimisation.</p>
+    <div class="controls">
+      <div class="ctrl-group">
+        <span class="ctrl-label">Server CPU Cores</span>
+        <input type="range" min="8" max="64" value="24" id="cpu-cap" oninput="document.getElementById('cpu-val').textContent=this.value+' cores'"/>
+        <span class="ctrl-val" id="cpu-val" style="color:var(--green)">24 cores</span>
+      </div>
+      <div class="ctrl-group">
+        <span class="ctrl-label">Server RAM (GB)</span>
+        <input type="range" min="8" max="128" value="48" id="ram-cap" oninput="document.getElementById('ram-val').textContent=this.value+' GB'"/>
+        <span class="ctrl-val" id="ram-val" style="color:var(--green)">48 GB</span>
+      </div>
+      <button class="btn btn-green" onclick="runKnapsack()" id="btn-knapsack">▶ ALLOCATE</button>
+    </div>
+    <div class="app-grid" id="app-grid"></div>
+    <div class="stats" id="ks-stats" style="display:none">
+      <div class="stat"><div class="stat-label">Priority Score</div><div class="stat-val" id="ks-score" style="color:var(--green)">—</div></div>
+      <div class="stat"><div class="stat-label">Apps Deployed</div><div class="stat-val" id="ks-apps" style="color:var(--cyan)">—</div></div>
+      <div class="stat"><div class="stat-label">CPU Used</div><div class="stat-val" id="ks-cpu" style="color:var(--amber)">—</div></div>
+      <div class="stat"><div class="stat-label">RAM Used</div><div class="stat-val" id="ks-ram" style="color:var(--purple)">—</div></div>
+    </div>
+    <div id="ks-bars" style="display:none">
+      <div class="progress-wrap">
+        <div class="progress-label"><span>CPU Utilisation</span><span id="ks-cpu-pct" style="color:var(--green)">—</span></div>
+        <div class="progress-track"><div class="progress-fill" id="ks-cpu-bar" style="background:var(--green);width:0%"></div></div>
+      </div>
+      <div class="progress-wrap">
+        <div class="progress-label"><span>RAM Utilisation</span><span id="ks-ram-pct" style="color:var(--cyan)">—</span></div>
+        <div class="progress-track"><div class="progress-fill" id="ks-ram-bar" style="background:var(--cyan);width:0%"></div></div>
+      </div>
+    </div>
+    <div class="terminal" id="term-ks">
+      <div class="t-dim">cloudmesh@node-01:~$ ./allocator --mode branch-bound</div>
+      <div class="t-info">→ Connected to backend. Set capacity and press ALLOCATE.</div>
+      <div><span class="t-cursor t-ok">█</span></div>
+    </div>
+  </div>
+</div>
+
+<!-- PANEL 2 — FORD-FULKERSON -->
+<div class="panel" id="panel-flow">
+  <div class="card">
+    <div class="card-header">
+      <span style="font-size:20px">🌐</span>
+      <span class="card-title">Maximum Bandwidth Router</span>
+      <span class="badge" style="background:rgba(0,212,200,0.1);color:var(--cyan);border:1px solid rgba(0,212,200,0.3)">FORD-FULKERSON — EDMONDS-KARP BFS</span>
+    </div>
+    <p class="desc">Find the maximum data throughput from DC-West to DC-East across the router mesh. The backend runs Edmonds-Karp BFS, returns each augmenting path found and the final flow on every edge.</p>
+    <div class="net-wrap"><svg id="flow-svg" viewBox="0 0 520 220" width="520" height="220" style="max-width:100%"></svg></div>
+    <div style="display:flex;gap:10px;align-items:center;margin-bottom:18px;flex-wrap:wrap">
+      <button class="btn btn-cyan" onclick="runFlow()" id="btn-flow">▶ COMPUTE MAX FLOW</button>
+      <span style="font-size:11px;color:var(--muted)">Source: <b style="color:var(--green)">DC-West</b> &nbsp;→&nbsp; Sink: <b style="color:var(--red)">DC-East</b></span>
+    </div>
+    <div class="stats" id="ff-stats" style="display:none">
+      <div class="stat"><div class="stat-label">Max Throughput</div><div class="stat-val" id="ff-flow" style="color:var(--cyan)">—</div><span class="stat-unit">Gbps</span></div>
+      <div class="stat"><div class="stat-label">Augmenting Paths</div><div class="stat-val" id="ff-paths" style="color:var(--green)">—</div></div>
+      <div class="stat"><div class="stat-label">Iterations</div><div class="stat-val" id="ff-iters" style="color:var(--amber)">—</div></div>
+    </div>
+    <div id="ff-table-wrap" style="display:none;margin-bottom:16px">
+      <table class="tbl">
+        <thead><tr><th>#</th><th>Augmenting Path</th><th>Flow (Gbps)</th><th>Cumulative</th></tr></thead>
+        <tbody id="ff-table-body"></tbody>
+      </table>
+    </div>
+    <div class="terminal" id="term-ff">
+      <div class="t-dim">cloudmesh@router-mesh:~$ ./maxflow --algo edmonds-karp</div>
+      <div class="t-info">→ Topology loaded. Press COMPUTE MAX FLOW.</div>
+      <div><span class="t-cursor t-ok">█</span></div>
+    </div>
+  </div>
+</div>
+
+<!-- PANEL 3 — BIPARTITE MATCHING -->
+<div class="panel" id="panel-bipartite">
+  <div class="card">
+    <div class="card-header">
+      <span style="font-size:20px">⚡</span>
+      <span class="card-title">Client-Server Load Balancer</span>
+      <span class="badge" style="background:rgba(192,132,252,0.1);color:var(--purple);border:1px solid rgba(192,132,252,0.3)">BIPARTITE MATCHING — AUGMENTING PATH</span>
+    </div>
+    <p class="desc">Assign incoming client requests to the optimal edge server. The backend runs maximum bipartite matching to ensure each client is served by exactly one server.</p>
+    <div class="bi-wrap" id="bi-viz"></div>
+    <div style="margin-bottom:18px">
+      <button class="btn btn-purple" onclick="runBipartite()" id="btn-bi">▶ MATCH CLIENTS</button>
+    </div>
+    <div class="stats" id="bi-stats" style="display:none">
+      <div class="stat"><div class="stat-label">Matched Clients</div><div class="stat-val" id="bi-matched" style="color:var(--purple)">—</div></div>
+      <div class="stat"><div class="stat-label">Efficiency</div><div class="stat-val" id="bi-eff" style="color:var(--green)">—</div><span class="stat-unit">%</span></div>
+      <div class="stat"><div class="stat-label">Free Servers</div><div class="stat-val" id="bi-free" style="color:var(--amber)">—</div></div>
+    </div>
+    <div class="terminal" id="term-bi">
+      <div class="t-dim">cloudmesh@lb-01:~$ ./matcher --algo augmenting-path</div>
+      <div class="t-info">→ 5 clients, 4 servers registered. Press MATCH CLIENTS.</div>
+      <div><span class="t-cursor t-ok">█</span></div>
+    </div>
+  </div>
+</div>
+
+<!-- PANEL 4 — VERTEX COVER -->
+<div class="panel" id="panel-vertex">
+  <div class="card">
+    <div class="card-header">
+      <span style="font-size:20px">🛡</span>
+      <span class="card-title">Security Node Placement</span>
+      <span class="badge" style="background:rgba(245,166,35,0.1);color:var(--amber);border:1px solid rgba(245,166,35,0.3)">VERTEX COVER — 2-APPROXIMATION</span>
+    </div>
+    <p class="desc">Place firewall/IDS on the minimum number of servers so every single network link is monitored. Minimum Vertex Cover is NP-hard; the backend computes a 2-approximation guaranteed within 2× optimal.</p>
+    <div class="net-wrap"><svg id="vc-svg" viewBox="0 0 400 260" width="400" height="260" style="max-width:100%"></svg></div>
+    <div style="margin-bottom:18px">
+      <button class="btn btn-amber" onclick="runVC()" id="btn-vc">▶ FIND MINIMUM COVER</button>
+    </div>
+    <div class="stats" id="vc-stats" style="display:none">
+      <div class="stat"><div class="stat-label">Monitor Nodes</div><div class="stat-val" id="vc-size" style="color:var(--amber)">—</div></div>
+      <div class="stat"><div class="stat-label">Total Nodes</div><div class="stat-val" id="vc-total" style="color:var(--text)">—</div></div>
+      <div class="stat"><div class="stat-label">Links Covered</div><div class="stat-val" id="vc-links" style="color:var(--green)">—</div></div>
+      <div class="stat"><div class="stat-label">2× Bound</div><div class="stat-val" id="vc-bound" style="color:var(--muted)">—</div></div>
+    </div>
+    <div id="vc-cover-wrap" style="display:none">
+      <hr class="divider"/>
+      <div style="font-size:10px;color:var(--muted);letter-spacing:1.5px;text-transform:uppercase;margin-bottom:8px">🛡 Firewall Install Targets:</div>
+      <div class="cover-nodes" id="vc-cover-nodes"></div>
+    </div>
+    <div class="terminal" id="term-vc">
+      <div class="t-dim">cloudmesh@sec-01:~$ ./vertexcover --approx 2</div>
+      <div class="t-info">→ Network topology loaded. Press FIND MINIMUM COVER.</div>
+      <div><span class="t-cursor t-ok">█</span></div>
+    </div>
+  </div>
+</div>
+
+<!-- PANEL 5 — MILLER-RABIN RSA -->
+<div class="panel" id="panel-rsa">
+  <div class="card">
+    <div class="card-header">
+      <span style="font-size:20px">🔐</span>
+      <span class="card-title">RSA Certificate Key Generator</span>
+      <span class="badge" style="background:rgba(255,76,94,0.1);color:var(--red);border:1px solid rgba(255,76,94,0.3)">MILLER-RABIN — MONTE CARLO TEST</span>
+    </div>
+    <p class="desc">The backend generates prime numbers for RSA encryption using the Miller-Rabin probabilistic primality test. 20 rounds reduce the false-positive probability to ≤ 4⁻²⁰ ≈ 9.1 × 10⁻¹³.</p>
+    <div class="controls">
+      <div class="ctrl-group">
+        <span class="ctrl-label">Key Size (bits)</span>
+        <input type="range" min="64" max="512" step="64" value="128" id="key-bits" oninput="document.getElementById('bits-val').textContent=this.value+' bits'"/>
+        <span class="ctrl-val" id="bits-val" style="color:var(--red)">128 bits</span>
+      </div>
+      <button class="btn btn-red" onclick="runRSA()" id="btn-rsa">▶ GENERATE KEYPAIR</button>
+    </div>
+    <div class="stats" id="rsa-stats" style="display:none">
+      <div class="stat"><div class="stat-label">Gen Time</div><div class="stat-val" id="rsa-time" style="color:var(--red)">—</div><span class="stat-unit">ms</span></div>
+      <div class="stat"><div class="stat-label">p Attempts</div><div class="stat-val" id="rsa-pa" style="color:var(--purple)">—</div></div>
+      <div class="stat"><div class="stat-label">q Attempts</div><div class="stat-val" id="rsa-qa" style="color:var(--cyan)">—</div></div>
+      <div class="stat"><div class="stat-label">MR Rounds</div><div class="stat-val" id="rsa-rounds" style="color:var(--amber)">20</div></div>
+    </div>
+    <div id="rsa-keys" style="display:none">
+      <hr class="divider"/>
+      <div class="split">
+        <div>
+          <div class="key-box"><div class="key-box-label">p (prime)</div><div class="key-box-val" id="rsa-p" style="color:var(--red)"></div></div>
+          <div class="key-box"><div class="key-box-label">q (prime)</div><div class="key-box-val" id="rsa-q" style="color:var(--purple)"></div></div>
+          <div class="key-box"><div class="key-box-label">n = p × q (modulus)</div><div class="key-box-val" id="rsa-n" style="color:var(--cyan)"></div></div>
+        </div>
+        <div>
+          <div class="key-box"><div class="key-box-label">e — public exponent</div><div class="key-box-val" id="rsa-e" style="color:var(--green)"></div></div>
+          <div class="key-box"><div class="key-box-label">d — private key</div><div class="key-box-val" id="rsa-d" style="color:var(--amber)"></div></div>
+          <div class="key-box" style="border-color:rgba(0,232,122,0.2)">
+            <div class="key-box-label">Verified: e × d ≡ 1 (mod φ(n))</div>
+            <div class="key-box-val" id="rsa-verify" style="color:var(--green)"></div>
+          </div>
+        </div>
+      </div>
+      <div style="margin-top:8px;padding:8px 12px;background:var(--bg3);border-radius:4px;font-size:10px;color:var(--muted)">
+        False positive probability: 4⁻¹ per round &nbsp;|&nbsp; After 20 rounds: ≤ 4⁻²⁰ ≈ 9.1 × 10⁻¹³
+      </div>
+    </div>
+    <div class="terminal" id="term-rsa">
+      <div class="t-dim">cloudmesh@crypto-01:~$ ./keygen --algo miller-rabin --rounds 20</div>
+      <div class="t-info">→ Primality engine online. Select key size and press GENERATE.</div>
+      <div><span class="t-cursor t-ok">█</span></div>
+    </div>
+  </div>
+</div>
+
+</main>
+
+<script>
+// ════════════════════════════════════════════
+// CONFIG — change port here if needed
+// ════════════════════════════════════════════
+const API = 'http://localhost:8000';
+document.getElementById('api-url-display').textContent = API;
+
+// ════════════════════════════════════════════
+// BACKEND HEALTH CHECK
+// ════════════════════════════════════════════
+async function checkBackend() {
+  const dot  = document.getElementById('status-dot');
+  const text = document.getElementById('status-text');
+  const banner = document.getElementById('offline-banner');
+  try {
+    const r = await fetch(API + '/health', { signal: AbortSignal.timeout(3000) });
+    if (r.ok) {
+      dot.className  = 'status-dot online';
+      text.textContent = 'Backend online';
+      banner.style.display = 'none';
+    } else throw new Error();
+  } catch {
+    dot.className  = 'status-dot offline';
+    text.textContent = 'Backend offline';
+    banner.style.display = 'block';
+  }
+}
+checkBackend();
+setInterval(checkBackend, 8000);
+
+// ════════════════════════════════════════════
+// HELPERS
+// ════════════════════════════════════════════
+function switchTab(id, btn) {
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('nav button').forEach(b => b.classList.remove('active'));
+  document.getElementById('panel-' + id).classList.add('active');
+  btn.classList.add('active');
+}
+
+function termLine(id, text, cls = '') {
+  const t = document.getElementById(id);
+  const cur = t.querySelector('.t-cursor');
+  if (cur) cur.parentElement.remove();
+  const div = document.createElement('div');
+  if (cls) div.className = cls;
+  div.textContent = text;
+  t.appendChild(div);
+  const cd = document.createElement('div');
+  cd.innerHTML = '<span class="t-cursor t-ok">█</span>';
+  t.appendChild(cd);
+  t.scrollTop = t.scrollHeight;
+}
+
+function setLoading(btnId, loading, label = '▶ RUN') {
+  const btn = document.getElementById(btnId);
+  btn.disabled = loading;
+  btn.innerHTML = loading ? `<span class="spinner"></span> RUNNING…` : label;
+}
+
+async function apiPost(endpoint, body) {
+  const res = await fetch(API + endpoint, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body)
+  });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return res.json();
+}
+
+// ════════════════════════════════════════════
+// DEFAULT DATA (sent to backend)
+// ════════════════════════════════════════════
+const APPS = [
+  { id:'svc-001', name:'Auth Service',     cpu:4,  ram:8,  priority:95 },
+  { id:'svc-002', name:'API Gateway',      cpu:6,  ram:12, priority:90 },
+  { id:'svc-003', name:'ML Inference',     cpu:16, ram:32, priority:85 },
+  { id:'svc-004', name:'Cache Layer',      cpu:2,  ram:16, priority:80 },
+  { id:'svc-005', name:'Log Aggregator',   cpu:3,  ram:6,  priority:60 },
+  { id:'svc-006', name:'Metrics Exporter', cpu:1,  ram:2,  priority:50 },
+  { id:'svc-007', name:'Search Engine',    cpu:8,  ram:20, priority:88 },
+];
+
+const FF_NODES = ['DC-West','Router-A','Router-B','Router-C','Router-D','DC-East'];
+const FF_EDGES = [
+  {source:'DC-West',  target:'Router-A', capacity:15},
+  {source:'DC-West',  target:'Router-B', capacity:10},
+  {source:'Router-A', target:'Router-C', capacity:12},
+  {source:'Router-A', target:'Router-D', capacity:10},
+  {source:'Router-B', target:'Router-C', capacity:8},
+  {source:'Router-B', target:'Router-D', capacity:6},
+  {source:'Router-C', target:'DC-East',  capacity:20},
+  {source:'Router-D', target:'DC-East',  capacity:15},
+];
+const FF_POS = { 'DC-West':[50,110],'Router-A':[190,45],'Router-B':[190,175],'Router-C':[340,45],'Router-D':[340,175],'DC-East':[470,110] };
+
+const BI_CLIENTS = ['Client-1','Client-2','Client-3','Client-4','Client-5'];
+const BI_SERVERS = ['Server-A','Server-B','Server-C','Server-D'];
+const BI_EDGES = [
+  {client:'Client-1',server:'Server-A'},{client:'Client-1',server:'Server-B'},
+  {client:'Client-2',server:'Server-B'},{client:'Client-2',server:'Server-C'},
+  {client:'Client-3',server:'Server-A'},{client:'Client-3',server:'Server-D'},
+  {client:'Client-4',server:'Server-C'},{client:'Client-4',server:'Server-D'},
+  {client:'Client-5',server:'Server-B'},{client:'Client-5',server:'Server-D'},
+];
+
+const VC_NODES = ['SRV-01','SRV-02','SRV-03','SRV-04','SRV-05','SRV-06'];
+const VC_EDGES = [
+  {u:'SRV-01',v:'SRV-02'},{u:'SRV-01',v:'SRV-03'},
+  {u:'SRV-02',v:'SRV-04'},{u:'SRV-03',v:'SRV-04'},
+  {u:'SRV-04',v:'SRV-05'},{u:'SRV-03',v:'SRV-06'},{u:'SRV-05',v:'SRV-06'},
+];
+const VC_POS = { 'SRV-01':[200,30],'SRV-02':[350,100],'SRV-03':[50,100],'SRV-04':[350,200],'SRV-05':[200,230],'SRV-06':[50,200] };
+
+// ════════════════════════════════════════════
+// INIT STATIC VISUALS
+// ════════════════════════════════════════════
+function initAppGrid() {
+  document.getElementById('app-grid').innerHTML = APPS.map((a, i) => `
+    <div class="app-chip" id="chip-${i}">
+      <div class="app-name">${a.name} <span style="color:var(--muted);font-size:10px">${a.id}</span></div>
+      <div class="app-meta">CPU: ${a.cpu} &nbsp;|&nbsp; RAM: ${a.ram}GB &nbsp;|&nbsp; Priority: ${a.priority}</div>
+    </div>`).join('');
+}
+initAppGrid();
+
+function drawFlowGraph(edgeFlows = []) {
+  const flowMap = {};
+  edgeFlows.forEach(e => flowMap[e.source + '>' + e.target] = e.flow);
+  const svg = document.getElementById('flow-svg');
+  let html = `<defs>
+    <marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0 0L10 5L0 10z" fill="#1e2e28"/></marker>
+    <marker id="arr-flow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0 0L10 5L0 10z" fill="#00d4c8"/></marker>
+  </defs>`;
+  FF_EDGES.forEach(e => {
+    const [x1,y1]=FF_POS[e.source],[x2,y2]=FF_POS[e.target];
+    const f = flowMap[e.source+'>'+e.target] || 0;
+    const mx=(x1+x2)/2, my=(y1+y2)/2-12;
+    html += `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}"
+      stroke="${f>0?'#00d4c8':'#1e2e28'}" stroke-width="${f>0?3:1.5}"
+      marker-end="${f>0?'url(#arr-flow)':'url(#arr)'}" opacity="${f>0?1:0.6}"/>`;
+    html += `<text x="${mx}" y="${my}" font-family="IBM Plex Mono" font-size="9"
+      fill="${f>0?'#00d4c8':'#2a4a3e'}" text-anchor="middle">${f>0?f+'/':''}${e.capacity} Gbps</text>`;
+  });
+  FF_NODES.forEach(n => {
+    const [x,y]=FF_POS[n];
+    const col = n==='DC-West'?'var(--green)':n==='DC-East'?'var(--red)':'var(--cyan)';
+    const parts = n.split('-');
+    html += `<circle cx="${x}" cy="${y}" r="26" fill="#0b0f0e" stroke="${col}" stroke-width="1.5"/>
+      <text x="${x}" y="${y-4}" font-family="Barlow Condensed" font-size="11" font-weight="700" fill="${col}" text-anchor="middle">${parts[0]}</text>
+      <text x="${x}" y="${y+9}" font-family="IBM Plex Mono" font-size="8" fill="${col}88" text-anchor="middle">${parts[1]||''}</text>`;
+  });
+  svg.innerHTML = html;
+}
+drawFlowGraph();
+
+function drawVC(cover = []) {
+  const svg = document.getElementById('vc-svg');
+  let html = '';
+  VC_EDGES.forEach(e => {
+    const [x1,y1]=VC_POS[e.u],[x2,y2]=VC_POS[e.v];
+    const covered = cover.includes(e.u)||cover.includes(e.v);
+    html += `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${covered?'#f5a62366':'#1e2e28'}" stroke-width="${covered?2:1.5}"/>`;
+  });
+  VC_NODES.forEach(n => {
+    const [x,y]=VC_POS[n], inC=cover.includes(n);
+    html += `<circle cx="${x}" cy="${y}" r="28" fill="${inC?'rgba(245,166,35,0.08)':'#0b0f0e'}" stroke="${inC?'var(--amber)':'var(--border)'}" stroke-width="${inC?2.5:1.5}"/>`;
+    html += `<text x="${x}" y="${y-4}" font-family="Barlow Condensed" font-size="13" font-weight="700" fill="${inC?'var(--amber)':'var(--muted)'}" text-anchor="middle">${n}</text>`;
+    if (inC) html += `<text x="${x}" y="${y+12}" font-family="IBM Plex Mono" font-size="9" fill="var(--amber)" text-anchor="middle">🛡</text>`;
+  });
+  svg.innerHTML = html;
+}
+drawVC();
+
+function buildBiViz(matchC = {}) {
+  const wrap = document.getElementById('bi-viz');
+  wrap.innerHTML = `
+    <div class="bi-col">${BI_CLIENTS.map(c=>`
+      <div class="bi-node" style="border-color:${matchC[c]?'var(--purple)':'var(--border)'};color:${matchC[c]?'var(--purple)':'var(--muted)'};">${c}</div>`).join('')}
+    </div>
+    <div class="bi-edges"><svg id="bi-svg"></svg></div>
+    <div class="bi-col">${BI_SERVERS.map(s => {
+      const used = Object.values(matchC).includes(s);
+      return `<div class="bi-node" style="border-color:${used?'var(--green)':'var(--border)'};color:${used?'var(--green)':'var(--muted)'};">${s}</div>`;
+    }).join('')}</div>`;
+
+  requestAnimationFrame(() => {
+    const svg = document.getElementById('bi-svg');
+    const ed  = svg?.parentElement;
+    if (!svg || !ed) return;
+    const W = ed.offsetWidth, H = ed.offsetHeight;
+    svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
+    svg.style.cssText = `width:${W}px;height:${H}px`;
+    const cNodes = wrap.querySelectorAll('.bi-col:first-child .bi-node');
+    const sNodes = wrap.querySelectorAll('.bi-col:last-child .bi-node');
+    const getY = (nodes, i) => {
+      if (!nodes[i]) return 0;
+      const er = ed.getBoundingClientRect(), nr = nodes[i].getBoundingClientRect();
+      return nr.top - er.top + nr.height / 2;
+    };
+    let lines = '';
+    BI_EDGES.forEach(e => {
+      const ci=BI_CLIENTS.indexOf(e.client), si=BI_SERVERS.indexOf(e.server);
+      if(ci<0||si<0)return;
+      const isMatch = matchC[e.client]===e.server;
+      lines += `<line x1="0" y1="${getY(cNodes,ci)}" x2="${W}" y2="${getY(sNodes,si)}"
+        stroke="${isMatch?'#c084fc':'#1e2e28'}" stroke-width="${isMatch?2.5:1}" opacity="${isMatch?1:0.4}"/>`;
+    });
+    svg.innerHTML = lines;
+  });
+}
+buildBiViz();
+
+// ════════════════════════════════════════════
+// UNIT 1 — KNAPSACK  →  POST /api/allocate
+// ════════════════════════════════════════════
+async function runKnapsack() {
+  const cpuCap = +document.getElementById('cpu-cap').value;
+  const ramCap = +document.getElementById('ram-cap').value;
+  setLoading('btn-knapsack', true, '▶ ALLOCATE');
+  termLine('term-ks', `$ POST /api/allocate  cpu=${cpuCap}  ram=${ramCap}`, 't-dim');
+  try {
+    const data = await apiPost('/api/allocate', {
+      applications: APPS, server_cpu: cpuCap, server_ram: ramCap
+    });
+    const selIds = data.selected_applications.map(a => a.id);
+    APPS.forEach((a, i) => {
+      const c = document.getElementById('chip-' + i);
+      const sel = selIds.includes(a.id);
+      c.classList.toggle('selected', sel);
+      c.classList.toggle('rejected', !sel);
+      c.querySelector('.app-name').innerHTML = `${a.name}
+        <span style="font-size:11px;color:${sel?'var(--green)':'var(--red)'}">${sel?'✓ DEPLOY':'✗ SKIP'}</span>`;
+    });
+    document.getElementById('ks-score').textContent = data.total_priority;
+    document.getElementById('ks-apps').textContent  = `${data.selected_applications.length}/${APPS.length}`;
+    document.getElementById('ks-cpu').textContent   = data.cpu_used + ' c';
+    document.getElementById('ks-ram').textContent   = data.ram_used + ' GB';
+    document.getElementById('ks-stats').style.display = 'flex';
+    document.getElementById('ks-cpu-pct').textContent = data.cpu_utilization + '%';
+    document.getElementById('ks-ram-pct').textContent = data.ram_utilization + '%';
+    document.getElementById('ks-cpu-bar').style.width = Math.min(data.cpu_utilization, 100) + '%';
+    document.getElementById('ks-ram-bar').style.width = Math.min(data.ram_utilization, 100) + '%';
+    document.getElementById('ks-cpu-bar').style.background = data.cpu_utilization > 90 ? 'var(--red)' : 'var(--green)';
+    document.getElementById('ks-bars').style.display = 'block';
+
+    const steps = data.branch_bound_steps || [];
+    termLine('term-ks', `→ B&B explored ${steps.length} nodes, ${steps.filter(s=>s.pruned).length} pruned`, 't-info');
+    termLine('term-ks', `✓ Deployed ${data.selected_applications.length}/${APPS.length} apps`, 't-ok');
+    termLine('term-ks', `✓ CPU: ${data.cpu_used}/${cpuCap} cores (${data.cpu_utilization}%)`, 't-ok');
+    termLine('term-ks', `✓ RAM: ${data.ram_used}/${ramCap} GB (${data.ram_utilization}%)`, 't-ok');
+    termLine('term-ks', `✓ Total priority score: ${data.total_priority}`, 't-ok');
+  } catch(e) {
+    termLine('term-ks', `✗ Error: ${e.message} — is the backend running?`, 't-err');
+  }
+  setLoading('btn-knapsack', false, '▶ ALLOCATE');
+}
+
+// ════════════════════════════════════════════
+// UNIT 2A — FORD-FULKERSON  →  POST /api/max-flow
+// ════════════════════════════════════════════
+async function runFlow() {
+  setLoading('btn-flow', true, '▶ COMPUTE MAX FLOW');
+  termLine('term-ff', '$ POST /api/max-flow  DC-West → DC-East', 't-dim');
+  try {
+    const data = await apiPost('/api/max-flow', {
+      nodes: FF_NODES, edges: FF_EDGES, source: 'DC-West', sink: 'DC-East'
+    });
+    drawFlowGraph(data.edge_flows || []);
+    document.getElementById('ff-flow').textContent  = data.max_flow;
+    document.getElementById('ff-paths').textContent = data.augmenting_paths.length;
+    document.getElementById('ff-iters').textContent = data.total_iterations;
+    document.getElementById('ff-stats').style.display = 'flex';
+
+    document.getElementById('ff-table-body').innerHTML = data.augmenting_paths.map(p => `<tr>
+      <td style="color:var(--muted)">${p.iteration}</td>
+      <td style="color:var(--cyan)">${p.path.join(' → ')}</td>
+      <td style="color:var(--green);font-weight:600">${p.flow}</td>
+      <td style="color:var(--text)">${p.cumulative_flow}</td></tr>`).join('');
+    document.getElementById('ff-table-wrap').style.display = 'block';
+
+    data.augmenting_paths.forEach(p =>
+      termLine('term-ff', `→ ${p.path.join(' → ')}  |  ${p.flow} Gbps`, 't-info'));
+    termLine('term-ff', `✓ Maximum throughput: ${data.max_flow} Gbps`, 't-ok');
+  } catch(e) {
+    termLine('term-ff', `✗ Error: ${e.message}`, 't-err');
+  }
+  setLoading('btn-flow', false, '▶ COMPUTE MAX FLOW');
+}
+
+// ════════════════════════════════════════════
+// UNIT 2B — BIPARTITE MATCHING  →  POST /api/match-servers
+// ════════════════════════════════════════════
+async function runBipartite() {
+  setLoading('btn-bi', true, '▶ MATCH CLIENTS');
+  termLine('term-bi', '$ POST /api/match-servers  5 clients ↔ 4 servers', 't-dim');
+  try {
+    const data = await apiPost('/api/match-servers', {
+      clients: BI_CLIENTS, servers: BI_SERVERS, edges: BI_EDGES
+    });
+    const matchC = {};
+    data.assignments.forEach(a => matchC[a.client] = a.server);
+    buildBiViz(matchC);
+
+    document.getElementById('bi-matched').textContent = `${data.matched_count}/${data.total_clients}`;
+    document.getElementById('bi-eff').textContent     = data.matching_efficiency;
+    document.getElementById('bi-free').textContent    = data.unmatched_servers.length;
+    document.getElementById('bi-stats').style.display = 'flex';
+
+    data.assignments.forEach(a => termLine('term-bi', `✓ ${a.client}  →  ${a.server}`, 't-ok'));
+    termLine('term-bi', `✓ Matched ${data.matched_count}/${data.total_clients} clients (${data.matching_efficiency}% efficiency)`, 't-ok');
+  } catch(e) {
+    termLine('term-bi', `✗ Error: ${e.message}`, 't-err');
+  }
+  setLoading('btn-bi', false, '▶ MATCH CLIENTS');
+}
+
+// ════════════════════════════════════════════
+// UNIT 3 — VERTEX COVER  →  POST /api/vertex-cover
+// ════════════════════════════════════════════
+async function runVC() {
+  setLoading('btn-vc', true, '▶ FIND MINIMUM COVER');
+  termLine('term-vc', `$ POST /api/vertex-cover  ${VC_NODES.length} nodes, ${VC_EDGES.length} edges`, 't-dim');
+  try {
+    const data = await apiPost('/api/vertex-cover', { nodes: VC_NODES, edges: VC_EDGES });
+    drawVC(data.vertex_cover);
+
+    document.getElementById('vc-size').textContent  = data.cover_size;
+    document.getElementById('vc-total').textContent = data.total_nodes;
+    document.getElementById('vc-links').textContent = `${data.monitored_edges}/${data.total_edges}`;
+    document.getElementById('vc-bound').textContent = data.approximation_bound;
+    document.getElementById('vc-stats').style.display = 'flex';
+
+    document.getElementById('vc-cover-nodes').innerHTML = data.vertex_cover.map(n =>
+      `<span class="cover-chip" style="color:var(--amber);border-color:rgba(245,166,35,0.4);background:rgba(245,166,35,0.08)">🛡 ${n}</span>`).join('');
+    document.getElementById('vc-cover-wrap').style.display = 'block';
+
+    data.algorithm_steps.forEach(s =>
+      termLine('term-vc', `→ Cover edge (${s.chosen_edge.join('↔')}) → added [${s.added_to_cover.join(', ')}]`, 't-info'));
+    termLine('term-vc', `✓ Minimum cover: [${data.vertex_cover.join(', ')}]`, 't-ok');
+    termLine('term-vc', `✓ All ${data.total_edges} links observed — ${data.approximation_bound}`, 't-ok');
+  } catch(e) {
+    termLine('term-vc', `✗ Error: ${e.message}`, 't-err');
+  }
+  setLoading('btn-vc', false, '▶ FIND MINIMUM COVER');
+}
+
+// ════════════════════════════════════════════
+// UNIT 4 — MILLER-RABIN RSA  →  POST /api/generate-keys
+// ════════════════════════════════════════════
+async function runRSA() {
+  const bits = +document.getElementById('key-bits').value;
+  setLoading('btn-rsa', true, '▶ GENERATE KEYPAIR');
+  termLine('term-rsa', `$ POST /api/generate-keys  key_size=${bits}`, 't-dim');
+  try {
+    const data = await apiPost('/api/generate-keys', { key_size: bits });
+
+    document.getElementById('rsa-time').textContent = data.generation_time_ms;
+    document.getElementById('rsa-pa').textContent   = data.p_generation_attempts;
+    document.getElementById('rsa-qa').textContent   = data.q_generation_attempts;
+    document.getElementById('rsa-stats').style.display = 'flex';
+
+    document.getElementById('rsa-p').textContent      = data.p;
+    document.getElementById('rsa-q').textContent      = data.q;
+    document.getElementById('rsa-n').textContent      = data.n;
+    document.getElementById('rsa-e').textContent      = data.e;
+    document.getElementById('rsa-d').textContent      = data.d;
+    document.getElementById('rsa-verify').textContent = data.key_verified ? '✓ VERIFIED' : '✗ FAILED';
+    document.getElementById('rsa-keys').style.display = 'block';
+
+    termLine('term-rsa', `→ p found after ${data.p_generation_attempts} candidate(s)`, 't-info');
+    termLine('term-rsa', `→ q found after ${data.q_generation_attempts} candidate(s)`, 't-info');
+    termLine('term-rsa', `✓ n = p × q computed`, 't-ok');
+    termLine('term-rsa', `✓ d = e⁻¹ mod φ(n) via Extended Euclidean`, 't-ok');
+    termLine('term-rsa', `✓ Verification: e×d ≡ 1 (mod φ(n)) — ${data.key_verified?'PASS':'FAIL'}`, 't-ok');
+    termLine('term-rsa', `✓ ${data.false_positive_probability}`, 't-ok');
+    termLine('term-rsa', `✓ Generated in ${data.generation_time_ms} ms`, 't-ok');
+  } catch(e) {
+    termLine('term-rsa', `✗ Error: ${e.message}`, 't-err');
+  }
+  setLoading('btn-rsa', false, '▶ GENERATE KEYPAIR');
+}
+</script>
+</body>
+</html>
